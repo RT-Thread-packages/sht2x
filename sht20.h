@@ -5,9 +5,9 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2018-07-30     Ernest Chen  first implementation.
+ * 2018-08-08     Ernest Chen  first implementation.
  */
- 
+
 #ifndef __SHT20_H__
 #define __SHT20_H__
 
@@ -20,21 +20,23 @@
 #include "drv_iic.h"
 
 #define SHT20_AVERAGE_TIMES 10
+typedef struct filter_data
+{
+    float buf[SHT20_AVERAGE_TIMES];
+    float average;
+
+    rt_off_t index;
+    rt_bool_t is_full;
+
+} filter_data_t;
 
 struct sht20_device
 {
     struct rt_i2c_bus_device *i2c;
 
 #ifdef SHT20_USING_SOFT_FILTER
-    struct
-    {
-        float buf[SHT20_AVERAGE_TIMES];
-        float average;
-
-        rt_off_t index;
-        rt_bool_t is_full;
-
-    } temp_filter, humi_filter;
+    filter_data_t temp_filter;
+    filter_data_t humi_filter;
 
     rt_thread_t thread;
     rt_uint32_t period;
