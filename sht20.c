@@ -5,9 +5,8 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2018-07-30     Ernest Chen  first implementation.
+ * 2018-08-08     Ernest Chen  first implementation.
  */
-
 
 #include <rthw.h>
 #include <rtthread.h>
@@ -23,7 +22,6 @@
 
 #include "sht20.h"
 
-#define BSP_USING_SHT20
 #ifdef BSP_USING_SHT20
 
 /*sht20 registers define */
@@ -51,7 +49,7 @@
 
 #define SHT20_ADDR 0x40
 
-static rt_err_t sht20_write_reg(struct rt_i2c_bus_device *bus, rt_uint8_t reg, rt_uint8_t data)
+static rt_err_t write_reg(struct rt_i2c_bus_device *bus, rt_uint8_t reg, rt_uint8_t data)
 {
     rt_uint8_t buf[2];
 
@@ -64,7 +62,7 @@ static rt_err_t sht20_write_reg(struct rt_i2c_bus_device *bus, rt_uint8_t reg, r
         return -RT_ERROR;
 }
 
-static rt_err_t sht20_read_regs(struct rt_i2c_bus_device *bus, rt_uint8_t reg, rt_uint8_t len, rt_uint8_t *buf)
+static rt_err_t read_regs(struct rt_i2c_bus_device *bus, rt_uint8_t reg, rt_uint8_t len, rt_uint8_t *buf)
 {
     struct rt_i2c_msg msgs[2];
 
@@ -88,7 +86,7 @@ static rt_err_t sht20_read_regs(struct rt_i2c_bus_device *bus, rt_uint8_t reg, r
     }
 }
 
-static rt_err_t sht20_write_cmd(struct rt_i2c_bus_device *bus, rt_uint8_t cmd)
+static rt_err_t write_cmd(struct rt_i2c_bus_device *bus, rt_uint8_t cmd)
 {
     struct rt_i2c_msg msgs;
 
@@ -103,8 +101,57 @@ static rt_err_t sht20_write_cmd(struct rt_i2c_bus_device *bus, rt_uint8_t cmd)
         return -RT_ERROR;
 }
 
+static float read_hw_humidity(sht20_device_t dev)
+{
+    rt_uint8_t temp[2];
+    float current_humi = 0.0;
+    rt_err_t result;
+
+    RT_ASSERT(dev);
+
+    result = rt_mutex_take(dev->lock, RT_WAITING_FOREVER);
+    if (result == RT_EOK)
+    {
+        read_regs(dev->i2c, TRIG_HUMI_MEASUREMENT_HM, 2, temp);
+
+        current_humi = -6 + (temp[1] | temp[0] << 8) * 125.0 / (1 << 16); //sensor humidity convert to reality
+    }
+    else
+    {
+        LOG_E("Relative humidity gets error at this time, please try again");
+    }
+    rt_mutex_release(dev->lock);
+
+    return current_humi;
+}
+
+static float read_hw_temperature(sht20_device_t dev)
+{
+    rt_uint8_t temp[2];
+    float current_temp = 0.0;
+    rt_err_t result;
+
+    RT_ASSERT(dev);
+
+    result = rt_mutex_take(dev->lock, RT_WAITING_FOREVER);
+    if (result == RT_EOK)
+    {
+        read_regs(dev->i2c, TRIG_TEMP_MEASUREMENT_HM, 2, temp);
+
+        current_temp = -46.85 + (temp[1] | temp[0] << 8) * 175.72 / (1 << 16); //sensor temperature convert to reality
+    }
+    else
+    {
+        LOG_E("Temperature gets error at this time, please try again");
+    }
+    rt_mutex_release(dev->lock);
+
+    return current_temp;
+}
+
 #ifdef SHT20_USING_SOFT_FILTER
-static void sht20_average_temp(sht20_device_t dev)
+
+static void average_measurement(sht20_device_t dev, filter_data_t *filter)
 {
     rt_uint32_t i;
     float sum = 0;
@@ -116,52 +163,63 @@ static void sht20_average_temp(sht20_device_t dev)
     result = rt_mutex_take(dev->lock, RT_WAITING_FOREVER);
     if (result == RT_EOK)
     {
-        if (dev->temp_filter.is_full)
+        if (filter->is_full)
         {
             temp = SHT20_AVERAGE_TIMES;
         }
         else
         {
-            temp = dev->temp_filter.index;
+            temp = filter->index + 1;
         }
 
         for (i = 0; i < temp; i++)
         {
-            sum += dev->temp_filter.buf[i];
+            sum += filter->buf[i];
         }
-        dev->temp_filter.average = sum / temp;
+        filter->average = sum / temp;
+    }
+    else
+    {
+        LOG_E("Gets average data error");
     }
     rt_mutex_release(dev->lock);
 }
 
-static void sht20_average_humi(sht20_device_t dev)
+static void sht20_filter_entry(void *device)
 {
-    rt_uint32_t i;
-    float sum = 0;
-    rt_uint32_t temp;
-    rt_err_t result;
+    RT_ASSERT(device);
 
-    RT_ASSERT(dev);
+    sht20_device_t dev = (sht20_device_t)device;
 
-    result = rt_mutex_take(dev->lock, RT_WAITING_FOREVER);
-    if (result == RT_EOK)
+    while (1)
     {
-        if (dev->humi_filter.is_full)
+        if (dev->temp_filter.index >= SHT20_AVERAGE_TIMES)
         {
-            temp = SHT20_AVERAGE_TIMES;
+            if (dev->temp_filter.is_full != RT_TRUE)
+            {
+                dev->temp_filter.is_full = RT_TRUE;
+            }
+
+            dev->temp_filter.index = 0;
         }
-        else
+        if (dev->humi_filter.index >= SHT20_AVERAGE_TIMES)
         {
-            temp = dev->humi_filter.index;
+            if (dev->humi_filter.is_full != RT_TRUE)
+            {
+                dev->humi_filter.is_full = RT_TRUE;
+            }
+
+            dev->humi_filter.index = 0;
         }
 
-        for (i = 0; i < temp; i++)
-        {
-            sum += dev->humi_filter.buf[i];
-        }
-        dev->humi_filter.average = sum / temp;
+        dev->temp_filter.buf[dev->temp_filter.index] = read_hw_temperature(dev);
+        dev->humi_filter.buf[dev->humi_filter.index] = read_hw_humidity(dev);
+
+        rt_thread_delay(rt_tick_from_millisecond(dev->period));
+
+        dev->temp_filter.index++;
+        dev->humi_filter.index++;
     }
-    rt_mutex_release(dev->lock);
 }
 #endif /* SHT20_USING_SOFT_FILTER */
 
@@ -176,7 +234,7 @@ rt_err_t sht20_softreset(sht20_device_t dev)
 {
     RT_ASSERT(dev);
 
-    sht20_write_cmd(dev->i2c, SOFT_RESET);
+    write_cmd(dev->i2c, SOFT_RESET);
     return 0;
 }
 
@@ -189,37 +247,13 @@ rt_err_t sht20_softreset(sht20_device_t dev)
  */
 float sht20_read_temperature(sht20_device_t dev)
 {
-    rt_uint8_t temp[2];
-    float S_T;
-    rt_err_t result;
-
-    RT_ASSERT(dev);
-
-    result = rt_mutex_take(dev->lock, RT_WAITING_FOREVER);
-    if (result == RT_EOK)
-    {
-        sht20_read_regs(dev->i2c, TRIG_TEMP_MEASUREMENT_HM, 2, temp);
-
-        S_T = -46.85 + (temp[1] | temp[0] << 8) * 175.72 / (1 << 16); //sensor temperature converse to reality
-
 #ifdef SHT20_USING_SOFT_FILTER
-        dev->temp_filter.buf[dev->temp_filter.index] = S_T;
+    average_measurement(dev, &dev->temp_filter);
+
+    return dev->temp_filter.average;
+#else
+    return read_hw_temperature(dev);
 #endif /* SHT20_USING_SOFT_FILTER */
-    }
-    else
-    {
-        LOG_E("read humidity error! ");
-        return -RT_ERROR;
-    }
-    rt_mutex_release(dev->lock);
-
-#ifdef SHT20_USING_SOFT_FILTER
-    sht20_average_temp(dev);
-    S_T = dev->temp_filter.average;
-
-#endif /* SHT20_USING_SOFT_FILTER */
-
-    return S_T;
 }
 
 /**
@@ -231,67 +265,14 @@ float sht20_read_temperature(sht20_device_t dev)
  */
 float sht20_read_humidity(sht20_device_t dev)
 {
-    rt_uint8_t temp[2];
-    float S_H;
-    rt_err_t result;
-
-    RT_ASSERT(dev);
-
-    result = rt_mutex_take(dev->lock, RT_WAITING_FOREVER);
-    if (result == RT_EOK)
-    {
-        sht20_read_regs(dev->i2c, TRIG_HUMI_MEASUREMENT_HM, 2, temp);
-
-        S_H = -6 + (temp[1] | temp[0] << 8) * 125.0 / (1 << 16); //sensor humidity converse to reality
-
 #ifdef SHT20_USING_SOFT_FILTER
-        dev->humi_filter.buf[dev->humi_filter.index] = S_H;
+    average_measurement(dev, &dev->humi_filter);
+
+    return dev->humi_filter.average;
+#else
+    return read_hw_humidity(dev);
 #endif /* SHT20_USING_SOFT_FILTER */
-    }
-    else
-    {
-        LOG_E("read humidity error! ");
-        return -RT_ERROR;
-    }
-    rt_mutex_release(dev->lock);
-
-#ifdef SHT20_USING_SOFT_FILTER
-    sht20_average_humi(dev);
-    S_H = dev->humi_filter.average;
-
-#endif /* SHT20_USING_SOFT_FILTER */
-
-    return S_H;
 }
-
-#ifdef SHT20_USING_SOFT_FILTER
-void sht20_filter_entry(void *device)
-{
-    RT_ASSERT(device);
-
-    sht20_device_t dev = (sht20_device_t)device;
-
-    while (1)
-    {
-
-        dev->temp_filter.buf[dev->temp_filter.index++] = sht20_read_temperature(dev);
-        dev->humi_filter.buf[dev->humi_filter.index++] = sht20_read_humidity(dev);
-
-        if (dev->temp_filter.index >= SHT20_AVERAGE_TIMES)
-        {
-            dev->temp_filter.is_full = RT_TRUE;
-            dev->temp_filter.index = 0;
-        }
-        if (dev->humi_filter.index >= SHT20_AVERAGE_TIMES)
-        {
-            dev->humi_filter.is_full = RT_TRUE;
-            dev->temp_filter.index = 0;
-        }
-
-        rt_thread_delay(dev->period);
-    }
-}
-#endif /* SHT20_USING_SOFT_FILTER */
 
 /**
  * This function initializes sht20 registered device driver
@@ -309,7 +290,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     dev = rt_calloc(1, sizeof(struct sht20_device));
     if (dev == RT_NULL)
     {
-        LOG_E("can't calloc sht20 %s device memory \r\n", i2c_bus_name);
+        LOG_E("can't calloc sht20 %s device memory ", i2c_bus_name);
         rt_free(dev);
         return RT_NULL;
     }
@@ -318,7 +299,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
 
     if (dev->i2c == RT_NULL)
     {
-        LOG_E("can't find sht20 %s device\r\n", i2c_bus_name);
+        LOG_E("can't find sht20 %s device", i2c_bus_name);
         rt_free(dev);
         return RT_NULL;
     }
@@ -326,7 +307,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     dev->lock = rt_mutex_create("mutex_sht20", RT_IPC_FLAG_FIFO);
     if (dev->lock == RT_NULL)
     {
-        LOG_E("can't create sht20 mutex of %s device\r\n", i2c_bus_name);
+        LOG_E("can't create sht20 mutex of %s device", i2c_bus_name);
         rt_free(dev);
         return RT_NULL;
     }
@@ -335,14 +316,14 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     if (dev->period == 0)
         dev->period = 1000; /* default */
 
-    dev->thread = rt_thread_create("sht20", sht20_filter_entry, (void *)dev, 512, 15, 10);
+    dev->thread = rt_thread_create("sht20", sht20_filter_entry, (void *)dev, 1024, 15, 10);
     if (dev->thread != RT_NULL)
     {
         rt_thread_startup(dev->thread);
     }
     else
     {
-        LOG_E("sht20 soft filter start error !\n");
+        LOG_E("sht20 soft filter start error ");
     }
 #endif /* SHT20_USING_SOFT_FILTER */
 
@@ -361,7 +342,7 @@ void sht20_deinit(sht20_device_t dev)
     rt_mutex_delete(dev->lock);
 
 #ifdef SHT20_USING_SOFT_FILTER
-		rt_thread_delete(dev->thread);
+    rt_thread_delete(dev->thread);
 #endif
 
     rt_free(dev);
@@ -388,22 +369,22 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
         if (!(value == SHT20_RES_12_14BIT || value == SHT20_RES_8_12BIT || value == SHT20_RES_10_13BIT || value == SHT20_RES_11_11BIT))
         {
-            LOG_E("parameter value is wrong !\r\n");
+            LOG_E("parameter value is wrong");
             return -RT_ERROR;
         }
 
         /* read user data */
-        sht20_read_regs(dev->i2c, USER_REG_R, 1, &temp);
+        read_regs(dev->i2c, USER_REG_R, 1, &temp);
 
         if (temp != value)
         {
             value |= temp & (~SHT20_RES_MASK);
 
-            sht20_write_reg(dev->i2c, USER_REG_W, value);
+            write_reg(dev->i2c, USER_REG_W, value);
         }
         else
         {
-            LOG_E("precision status does not change !\r\n");
+            LOG_E("precision status does not change");
         }
 
         break;
@@ -415,23 +396,23 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
         if (!(value == SHT20_BATTERY_HIGH || value == SHT20_BATTERY_LOW))
         {
-            LOG_E("parameter value is wrong !\r\n");
+            LOG_E("parameter value is wrong");
             return -RT_ERROR;
         }
 
         /* read user data */
-        sht20_read_regs(dev->i2c, USER_REG_R, 1, &temp);
+        read_regs(dev->i2c, USER_REG_R, 1, &temp);
 
         if (temp != value)
         {
 
             value |= temp & (~SHT20_BATTERY_MASK);
 
-            sht20_write_reg(dev->i2c, USER_REG_W, value);
+            write_reg(dev->i2c, USER_REG_W, value);
         }
         else
         {
-            LOG_E("battery status does not change!\r\n");
+            LOG_E("battery status does not change");
         }
 
         break;
@@ -442,22 +423,22 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
         if (!(value == SHT20_HEATER_ON || value == SHT20_HEATER_OFF))
         {
-            LOG_E("parameter value is wrong !\r\n");
+            LOG_E("parameter value is wrong");
             return -RT_ERROR;
         }
 
         /* read user data */
-        sht20_read_regs(dev->i2c, USER_REG_R, 1, &temp);
+        read_regs(dev->i2c, USER_REG_R, 1, &temp);
 
         if (temp != value)
         {
             value |= temp & (~SHT20_HEATER_MASK);
 
-            sht20_write_reg(dev->i2c, USER_REG_W, value);
+            write_reg(dev->i2c, USER_REG_W, value);
         }
         else
         {
-            LOG_E("heating status does not change!\r\n");
+            LOG_E("heating status does not change");
         }
 
         break;
@@ -487,7 +468,7 @@ rt_err_t sht20_get_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
         rt_uint8_t temp;
 
         /* read user data */
-        sht20_read_regs(dev->i2c, USER_REG_R, 1, &temp);
+        read_regs(dev->i2c, USER_REG_R, 1, &temp);
         *value = temp & SHT20_RES_MASK;
 
         break;
@@ -498,7 +479,7 @@ rt_err_t sht20_get_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
         rt_uint8_t temp;
 
         /* read user data */
-        sht20_read_regs(dev->i2c, USER_REG_R, 1, &temp);
+        read_regs(dev->i2c, USER_REG_R, 1, &temp);
 
         *value = temp & SHT20_BATTERY_MASK;
 
@@ -509,7 +490,7 @@ rt_err_t sht20_get_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
         rt_uint8_t temp;
 
         /* read user data */
-        sht20_read_regs(dev->i2c, USER_REG_R, 1, &temp);
+        read_regs(dev->i2c, USER_REG_R, 1, &temp);
 
         *value = temp & SHT20_HEATER_MASK;
 
@@ -553,12 +534,12 @@ void sht20(int argc, char *argv[])
                 float humidity;
                 float temperature;
 
-                /* read the sensor */
+                /* read the sensor data */
                 humidity = sht20_read_humidity(dev);
-                rt_kprintf("read sht20 sensor humidity   :%d \n", (int)humidity);
-
                 temperature = sht20_read_temperature(dev);
-                rt_kprintf("read sht20 sensor temperature:%d \n", (int)temperature);
+
+                rt_kprintf("read sht20 sensor humidity   : %d.%d %%\n", (int)humidity, (int)(humidity * 10) % 10);
+                rt_kprintf("read sht20 sensor temperature: %d.%d \n", (int)temperature, (int)(temperature * 10) % 10);
             }
             else
             {
