@@ -22,7 +22,7 @@
 
 #include "sht20.h"
 
-#ifdef BSP_USING_SHT20
+#ifdef PKG_USING_SHT20
 
 /*sht20 registers define */
 #define TRIG_TEMP_MEASUREMENT_HM 0xE3   // trigger temperature measurement on hold master
