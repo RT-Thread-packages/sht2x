@@ -5,7 +5,7 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2018-08-08     Ernest Chen  first implementation.
+ * 2018-08-08     Ernest Chen  the first version
  */
 
 #ifndef __SHT20_H__
