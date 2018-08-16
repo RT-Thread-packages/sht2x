@@ -117,7 +117,7 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 ````
 SHT20_PARAM_PRECISION        //设置 ADC 转换位数
 SHT20_PARAM_BATTERY_STATUS   //设置电池提示状态
-SHT20_PARAM_HEATING			//设置是否加热
+SHT20_PARAM_HEATING          //设置是否加热
 ````
 
 对于 ADC 存储容量，有四种类型，分别表示如下
