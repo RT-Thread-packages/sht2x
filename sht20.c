@@ -5,7 +5,7 @@
  *
  * Change Logs:
  * Date           Author       Notes
- * 2018-08-08     Ernest Chen  first implementation.
+ * 2018-08-08     Ernest Chen  the first version
  */
 
 #include <rthw.h>
@@ -22,7 +22,7 @@
 
 #include "sht20.h"
 
-#ifdef PKG_USING_SHT20
+#ifdef PKG_USING_SHT2X
 
 /*sht20 registers define */
 #define TRIG_TEMP_MEASUREMENT_HM 0xE3   // trigger temperature measurement on hold master
@@ -299,7 +299,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
 
     if (dev->i2c == RT_NULL)
     {
-        LOG_E("can't find sht20 %s device", i2c_bus_name);
+        LOG_E("can't find sht20 '%s' device", i2c_bus_name);
         rt_free(dev);
         return RT_NULL;
     }
@@ -561,4 +561,4 @@ void sht20(int argc, char *argv[])
 
 MSH_CMD_EXPORT(sht20, sht20 sensor function);
 
-#endif /* BSP_USING_SHT20 */
+#endif /* PKG_USING_SHT2X */
