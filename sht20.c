@@ -118,7 +118,7 @@ static float read_hw_humidity(sht20_device_t dev)
     }
     else
     {
-        LOG_E("Relative humidity gets error at this time, please try again");
+        LOG_E("The sht20 could not respond relative humidity measurement at this time. Please try again");
     }
     rt_mutex_release(dev->lock);
 
@@ -142,7 +142,7 @@ static float read_hw_temperature(sht20_device_t dev)
     }
     else
     {
-        LOG_E("Temperature gets error at this time, please try again");
+        LOG_E("The sht20 could not respond temperature measurement at this time. Please try again");
     }
     rt_mutex_release(dev->lock);
 
@@ -180,7 +180,7 @@ static void average_measurement(sht20_device_t dev, filter_data_t *filter)
     }
     else
     {
-        LOG_E("Gets average data error");
+        LOG_E("The software failed to average at this time, please try again");
     }
     rt_mutex_release(dev->lock);
 }
@@ -290,7 +290,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     dev = rt_calloc(1, sizeof(struct sht20_device));
     if (dev == RT_NULL)
     {
-        LOG_E("can't calloc sht20 %s device memory ", i2c_bus_name);
+        LOG_E("Can't allocate memory for sht20 device on '%s' ", i2c_bus_name);
         rt_free(dev);
         return RT_NULL;
     }
@@ -299,7 +299,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
 
     if (dev->i2c == RT_NULL)
     {
-        LOG_E("can't find sht20 '%s' device", i2c_bus_name);
+        LOG_E("Can't find sht20 device on '%s' ", i2c_bus_name);
         rt_free(dev);
         return RT_NULL;
     }
@@ -307,8 +307,9 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     dev->lock = rt_mutex_create("mutex_sht20", RT_IPC_FLAG_FIFO);
     if (dev->lock == RT_NULL)
     {
-        LOG_E("can't create sht20 mutex of %s device", i2c_bus_name);
+        LOG_E("Can't create mutex for sht20 device on '%s' ", i2c_bus_name);
         rt_free(dev);
+        
         return RT_NULL;
     }
 
@@ -323,7 +324,9 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     }
     else
     {
-        LOG_E("sht20 soft filter start error ");
+        LOG_E("Can't start filtering function for sht20 device on '%s' ", i2c_bus_name);
+        rt_mutex_delete(dev->lock);
+        rt_free(dev);
     }
 #endif /* SHT20_USING_SOFT_FILTER */
 
@@ -369,7 +372,7 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
         if (!(value == SHT20_RES_12_14BIT || value == SHT20_RES_8_12BIT || value == SHT20_RES_10_13BIT || value == SHT20_RES_11_11BIT))
         {
-            LOG_E("parameter value is wrong");
+            LOG_E("Parameter value is invalid");
             return -RT_ERROR;
         }
 
@@ -382,11 +385,6 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
             write_reg(dev->i2c, USER_REG_W, value);
         }
-        else
-        {
-            LOG_E("precision status does not change");
-        }
-
         break;
     }
 
@@ -396,7 +394,7 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
         if (!(value == SHT20_BATTERY_HIGH || value == SHT20_BATTERY_LOW))
         {
-            LOG_E("parameter value is wrong");
+            LOG_E("Parameter value is invalid");
             return -RT_ERROR;
         }
 
@@ -410,11 +408,6 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
             write_reg(dev->i2c, USER_REG_W, value);
         }
-        else
-        {
-            LOG_E("battery status does not change");
-        }
-
         break;
     }
     case SHT20_PARAM_HEATING:
@@ -423,7 +416,7 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
         if (!(value == SHT20_HEATER_ON || value == SHT20_HEATER_OFF))
         {
-            LOG_E("parameter value is wrong");
+            LOG_E("Parameter value is invalid");
             return -RT_ERROR;
         }
 
@@ -436,11 +429,6 @@ rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t
 
             write_reg(dev->i2c, USER_REG_W, value);
         }
-        else
-        {
-            LOG_E("heating status does not change");
-        }
-
         break;
     }
     }
