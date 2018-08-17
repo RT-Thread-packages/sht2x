@@ -314,8 +314,7 @@ sht20_device_t sht20_init(const char *i2c_bus_name)
     }
 
 #ifdef SHT20_USING_SOFT_FILTER
-    if (dev->period == 0)
-        dev->period = 1000; /* default */
+    dev->period = SHT20_SAMPLE_PERIOD;
 
     dev->thread = rt_thread_create("sht20", sht20_filter_entry, (void *)dev, 1024, 15, 10);
     if (dev->thread != RT_NULL)
