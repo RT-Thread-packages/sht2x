@@ -132,7 +132,7 @@ SHT20_PARAM_BATTERY_STATUS   //设置电池提示状态
 SHT20_PARAM_HEATING          //设置是否加热
 ````
 
-对于 ADC 存储容量，有四种类型，分别表示如下
+对于 ADC 转换位数，有四种类型，分别表示如下
 
 ```
 SHT20_RES_12_14BIT 0x00 // 湿度12位，温度14位(默认)
