@@ -19,7 +19,7 @@
 
 #include "drv_iic.h"
 
-#define SHT20_AVERAGE_TIMES 10
+#ifdef SHT20_USING_SOFT_FILTER
 typedef struct filter_data
 {
     float buf[SHT20_AVERAGE_TIMES];
@@ -29,6 +29,7 @@ typedef struct filter_data
     rt_bool_t is_full;
 
 } filter_data_t;
+#endif /* SHT20_USING_SOFT_FILTER */
 
 struct sht20_device
 {
