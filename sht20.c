@@ -104,7 +104,7 @@ static rt_err_t write_cmd(struct rt_i2c_bus_device *bus, rt_uint8_t cmd)
 static float read_hw_humidity(sht20_device_t dev)
 {
     rt_uint8_t temp[2];
-    float current_humi = 0.0;
+    float current_humi = 0.0; //The data is error with missing measurement. 
     rt_err_t result;
 
     RT_ASSERT(dev);
@@ -128,7 +128,7 @@ static float read_hw_humidity(sht20_device_t dev)
 static float read_hw_temperature(sht20_device_t dev)
 {
     rt_uint8_t temp[2];
-    float current_temp = 0.0;
+    float current_temp = -46.85; //The data is error with missing measurement. 
     rt_err_t result;
 
     RT_ASSERT(dev);
