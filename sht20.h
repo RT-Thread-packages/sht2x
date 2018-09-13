@@ -17,8 +17,6 @@
 #include <rthw.h>
 #include <rtdevice.h>
 
-#include "drv_iic.h"
-
 #ifdef SHT20_USING_SOFT_FILTER
 typedef struct filter_data
 {
