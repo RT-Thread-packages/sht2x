@@ -1,202 +1,215 @@
-# SHT2x 软件包
+# SHT2x package
 
-## 1 介绍
+[中文页](README_ZH.md) | English
 
-SHT2x 软件包提供了使用温度与湿度传感器 `sht20` 基本功能，并且提供了软件平均数滤波器可选功能 。本文介绍该软件包的基本功能，以及 `Finsh/MSH` 测试命令等。
+## 1. Introduction
 
-基本功能主要由传感器 `aht10` 决定：在输入电压为 `1.8v-3.3v` 范围内，测量温度与湿度的量程、精度如下表所示 
+The SHT2x software package provides the basic function of using the temperature and humidity sensor `sht20`, as well as the optional function of the software average filter. This article introduces the basic functions of the software package and the `Finsh/MSH` test commands.
 
-| 功能 | 量程          | 精度    |
+The basic functions are mainly determined by the sensor `aht10`: within the range of input voltage `1.8v-3.3v`, the measuring range and accuracy of temperature and humidity are shown in the table below
+
+| Function | Range | Accuracy |
 | ---- | ------------- | ------- |
-| 温度 | `-40℃ - 125℃` | `±0.3℃` |
-| 湿度 | `0% - 100%`   | `±3%`   |
+| Temperature | `-40℃-125℃` | `±0.3℃` |
+| Humidity | `0%-100%` | `±3%` |
 
-### 1.1 目录结构
+### 1.1 Directory structure
 
-| 名称 | 说明 |
+| Name | Description |
 | ---- | ---- |
-| sht20.h | 传感器使用头文件 |
-| sht20.c | 传感器使用源代码 |
-| SConscript | RT-Thread 默认的构建脚本 |
-| README.md | 软件包使用说明 |
-| SHT20_datasheet.pdf| 官方数据手册 |
+| sht20.h | Sensor header file |
+| sht20.c | Sensor use source code |
+| SConscript | RT-Thread default build script |
+| README.md | Package Instructions |
+| SHT20_datasheet.pdf| Official Data Sheet |
 
-### 1.2 许可证
+### 1.2 License
 
-SHT2x 软件包遵循  Apache-2.0 许可，详见 LICENSE 文件。
+The SHT2x software package complies with the Apache-2.0 license, see the LICENSE file for details.
 
-### 1.3 依赖
+### 1.3 Dependency
 
-依赖 `RT-Thread I2C` 设备驱动框架。
+Rely on `RT-Thread I2C` device driver framework.
 
-## 2 获取软件包
+## 2 Get the package
 
-使用 `sht2x` 软件包需要在 RT-Thread 的包管理器中选择它，具体路径如下：
+To use the `sht2x` package, you need to select it in the package manager of RT-Thread. The specific path is as follows:
 
 ```
 RT-Thread online packages
-    peripheral libraries and drivers  --->
-        [*] sht2x: digital humidity and temperature sensor sht2x driver library  --->
-        [*]    Enable average filter by software                                    
-        (10)     The number of averaging
-        (1000)   Peroid of sampling data(unit ms)                                               
-               Version (latest)  --->
+    peripheral libraries and drivers --->
+        [*] sht2x: digital humidity and temperature sensor sht2x driver library --->
+        [*] Enable average filter by software
+        (10) The number of averaging
+        (1000) Peroid of sampling data(unit ms)
+               Version (latest) --->
 ```
 
 
-每个功能的配置说明如下：
+The configuration instructions for each function are as follows:
 
-- `sht2x: digital humidity and temperature sensor sht2x driver library`：选择使用 `sht20` 软件包；
-- `Enable average filter by software`：开启采集温湿度软件平均数滤波器功能；
-- `The number of averaging`：取平均数的采样数目；
-- `Peroid of sampling data(unit ms)`：采集数据的周期，时间单位 `ms`；
-- `Version`：配置软件包版本，默认最新版本。
+- `sht2x: digital humidity and temperature sensor sht2x driver library`: choose to use the `sht20` software package;
+- `Enable average filter by software`: enable the average filter function of the software for collecting temperature and humidity;
+- `The number of averaging`: the number of samples to average;
+- `Peroid of sampling data(unit ms)`: The period of sampling data, the time unit is `ms`;
+- `Version`: Configure the software package version, the latest version is the default.
 
-然后让 RT-Thread 的包管理器自动更新，或者使用 `pkgs --update` 命令更新包到 BSP 中。
+Then let RT-Thread's package manager automatically update, or use the `pkgs --update` command to update the package to the BSP.
 
-## 3 使用 sht2x 软件包
+## 3 Use sht2x package
 
-按照前文介绍，获取 `sht2x` 软件包后，就可以按照 下文提供的 API 使用传感器 `sht20` 与 `Finsh/MSH` 命令进行测试，详细内容如下。
+According to the previous introduction, after obtaining the `sht2x` software package, you can use the sensor `sht20` and `Finsh/MSH` commands to test according to the API provided below. The details are as follows.
 
 ### 3.1 API
 
-#### 3.1.1  初始化 
+#### 3.1.1 Initialization
 
-`sht20_device_t sht20_init(const char *i2c_bus_name)`
+```
+sht20_device_t sht20_init(const char *i2c_bus_name)
+```
 
-根据总线名称，自动初始化对应的 SHT20 设备，具体参数与返回说明如下表
+According to the bus name, the corresponding SHT20 device is automatically initialized. The specific parameters and return description are as follows
 
-| 参数    | 描述                      |
+| Parameters | Description |
 | :----- | :----------------------- |
-| name   | i2c 设备名称 |
-| **返回** | **描述** |
-| != NULL | 将返回 sht20 设备对象 |
-| = NULL | 查找失败 |
+| name | i2c device name |
+| **Back** | **Description** |
+| != NULL | will return sht20 device object |
+| = NULL | Find failed |
 
-#### 3.1.2  反初始化
+#### 3.1.2 Deinitialization
 
+```
 void sht20_deinit(sht20_device_t dev)
+```
 
-如果设备不再使用，反初始化将回收 sht20 设备的相关资源，具体参数说明如下表
+If the device is no longer used, deinitialization will reclaim the relevant resources of the sht20 device. The specific parameters are described in the following table
 
-| 参数 | 描述           |
+| Parameters | Description |
 | :--- | :------------- |
-| dev  | sht20 设备对象 |
+| dev | sht20 device object |
 
-#### 3.1.3 读取温度
+#### 3.1.3 Read temperature
 
+```
 float sht20_read_temperature(sht20_device_t dev)
+```
 
-通过 `sht20` 传感器读取温度测量值，返回浮点型温度值，具体参数与返回说明如下表
+Read the temperature measurement value through the `sht20` sensor, and return the floating-point temperature value. The specific parameters and return description are as follows
 
-| 参数     | 描述           |
+| Parameters | Description |
 | :------- | :------------- |
-| dev      | sht20 设备对象 |
-| **返回** | **描述**       |
-| != 0.0   | 测量温度值     |
-| =0.0     | 测量失败       |
+| dev | sht20 device object |
+| **Back** | **Description** |
+| != 0.0 | Measuring temperature value |
+| =0.0 | Measurement failed |
 
-#### 3.1.4 读取湿度
+#### 3.1.4 Read humidity
 
+```
 float sht20_read_humidity(sht20_device_t dev)
+```
 
-通过 `sht20` 传感器读取湿度测量值，返回浮点型湿度值，具体参数与返回说明如下表
+Read the humidity measurement value through the `sht20` sensor and return the floating-point humidity value. The specific parameters and return description are as follows
 
-| 参数     | 描述            |
+| Parameters | Description |
 | :------- | :-------------- |
-| dev      | `sht20`设备对象 |
-| **返回** | **描述**        |
-| != 0.0   | 测量湿度值      |
-| =0.0     | 测量失败        |
+| dev | `sht20` device object |
+| **Back** | **Description** |
+| != 0.0 | Measuring humidity value |
+| =0.0 | Measurement failed |
 
-#### 3.1.5 设置参数
+#### 3.1.5 Setting parameters
 
+```
 rt_err_t sht20_set_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t value)
+```
 
-通过 `sht20` 参数命令，设置相关参数的值，具体参数与返回说明如下表
+Use the `sht20` parameter command to set the value of related parameters. The specific parameters and return description are as follows
 
-| 参数      | 描述            |
+| Parameters | Description |
 | :-------- | :-------------- |
-| dev       | `sht20`设备对象 |
-| type      | `sht20`命令类型 |
-| value     | 设置命令值      |
-| **返回**  | **描述**        |
-| RT_EOK    | 设置成功        |
-| -RT_ERROR | 设置失败        |
+| dev | `sht20` device object |
+| type | `sht20` command type |
+| value | Set command value |
+| **Back** | **Description** |
+| RT_EOK | Set successfully |
+| -RT_ERROR | Setting failed |
 
-`sht20`命令类型有三种，分别如下：
+There are three types of `sht20` commands, as follows:
 
 ````
-SHT20_PARAM_PRECISION        //设置 ADC 转换位数
-SHT20_PARAM_BATTERY_STATUS   //设置电池提示状态
-SHT20_PARAM_HEATING          //设置是否加热
+SHT20_PARAM_PRECISION         //Set ADC conversion digits
+SHT20_PARAM_BATTERY_STATUS    //Set the battery reminder status
+SHT20_PARAM_HEATING           //Set whether to heat
 ````
 
-对于 ADC 转换位数，有四种类型，分别表示如下
+There are four types of ADC conversion bits, which are represented as follows
 
 ```
-SHT20_RES_12_14BIT 0x00 // 湿度12位，温度14位(默认)
-SHT20_RES_8_12BIT 0x01  // 湿度8位，温度12位
-SHT20_RES_10_13BIT 0x80 // 湿度10位，温度12位
-SHT20_RES_11_11BIT 0x81 // 湿度11位，温度11位
+SHT20_RES_12_14BIT 0x00  // Humidity 12 bits, temperature 14 bits (default)
+SHT20_RES_8_12BIT 0x01   // 8 bits for humidity, 12 bits for temperature
+SHT20_RES_10_13BIT 0x80  // 10 bits for humidity, 12 bits for temperature
+SHT20_RES_11_11BIT 0x81  // Humidity 11 bits, temperature 11 bits
 ```
 
-#### 3.1.6 读取参数
+#### 3.1.6 Read parameters
 
+```
 rt_err_t sht20_get_param(sht20_device_t dev, sht20_param_type_t type, rt_uint8_t *value)
+```
 
-通过 `sht20` 参数命令，读取相关参数的值，具体参数与返回说明如下表
+Through the `sht20` parameter command, read the value of related parameters, the specific parameters and return description are as follows
 
-| 参数      | 描述            |
+| Parameters | Description |
 | :-------- | :-------------- |
-| dev       | `sht20`设备对象 |
-| type      | `sht20`命令类型 |
-| value     | 获取命令值      |
-| **返回**  | **描述**        |
-| RT_EOK    | 获取成功        |
-| -RT_ERROR | 获取失败        |
+| dev | `sht20` device object |
+| type | `sht20` command type |
+| value | Get command value |
+| **Back** | **Description** |
+| RT_EOK | Successfully obtained |
+| -RT_ERROR | Get failed |
 
-### 3.2 Finsh/MSH 测试命令
+### 3.2 Finsh/MSH test commands
 
-sht2x 软件包提供了丰富的测试命令，项目只要在 RT-Thread 上开启 Finsh/MSH 功能即可。在做一些基于 `sht2x` 的应用开发、调试时，这些命令会非常实用，它可以准确的读取指传感器测量的温度与湿度。具体功能可以输入 `sht20` ，可以查看完整的命令列表
+The sht2x software package provides a wealth of test commands, and the project only needs to enable the Finsh/MSH function on RT-Thread. When doing some application development and debugging based on `sht2x`, these commands will be very useful. It can accurately read the temperature and humidity measured by the sensor. For specific functions, you can enter `sht20` to view the complete command list
 
 ```
 msh />sht20
 Usage:
-sht20 probe <dev_name>   - probe sensor by given name
-sht20 read               - read sensor sht20 data
+sht20 probe <dev_name>-probe sensor by given name
+sht20 read-read sensor sht20 data
 msh />
 ```
 
-#### 3.2.1 在指定的 i2c 总线上探测传感器 
+#### 3.2.1 Detect the sensor on the specified i2c bus
 
-当第一次使用 `sht20` 命令时，直接输入 `sht20 probe <dev_name>` ，其中 `<dev_name>` 为指定的 i2c 总线，例如：i2c0`。如果有这个传感器，就不会提示错误；如果总线上没有这个传感器，将会显示提示找不到相关设备，日志如下：
+When using the `sht20` command for the first time, directly enter `sht20 probe <dev_name>`, where `<dev_name>` is the designated i2c bus, for example: i2c0`. If there is this sensor, no error will be prompted; if there is no such sensor on the bus, it will display a prompt that the relevant device cannot be found, the log is as follows:
 
 ```
-msh />sht20 probe i2c1      #探测成功，没有错误日志
+msh />sht20 probe i2c1 #Detection is successful, no error log
 msh />
-msh />sht20 probe i2c88     #探测失败，提示对应的 I2C 设备找不到
-[E/sht20] can't find sht20 device on 'i2c88'
+msh />sht20 probe i2c88 #Detection failed, prompting that the corresponding I2C device could not be found
+[E/sht20] can't find sht20 device on'i2c88'
 msh />
 ```
 
-#### 3.2.2 读取数据
+#### 3.2.2 Read data
 
-探测成功之后，输入 `sht20 read` 即可获取温度与湿度，包括提示信息，日志如下： 
+After the detection is successful, enter `sht20 read` to get the temperature and humidity, including prompt information, the log is as follows:
 
 ```
 msh />sht20 read
-read sht20 sensor humidity   : 54.7 %
-read sht20 sensor temperature: 27.3 
+read sht20 sensor humidity: 54.7%
+read sht20 sensor temperature: 27.3
 msh />
 ```
 
-## 4 注意事项
+## 4 Notes
 
-暂无。
+Nothing.
 
-## 5 联系方式
+## 5 Contact
 
-* 维护：[Ernest](https://github.com/ErnestChen1)
-* 主页：https://github.com/RT-Thread-packages/sht2x
-
+* Maintenance: [Ernest](https://github.com/ErnestChen1)
+* Homepage: https://github.com/RT-Thread-packages/sht2x
